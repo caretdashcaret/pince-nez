@@ -38,10 +38,25 @@ def bisect(midpoint, number_of_segments, spacing):
         bpy.ops.mesh.select_all() #toggle select
         bpy.ops.mesh.select_all() #toggle select
         bpy.ops.mesh.bisect(plane_co=(x_co, 0.0, 0.0), plane_no=(1.0, 0.0, 0.0), threshold=0, xstart=0, xend=10, ystart=0, yend=100)
+        
+def find_max_x(selected_object):
+    """Returns the max x cordinate of all the vertices"""
+    mesh = selected_object.data
+    max_x_co = max([vertex.co[0] for vertex in mesh.vertices])
+    return max_x_co
+        
+def find_bridge_area(max_x_co):
+    """Suppose the bridge area is 16% of the entire length of the frame"""
+    return 0.14 * max_x_co * 2
+    
 
-def bisect_bridge_area():
+def bisect_bridge_area(bridge_area):
     """bisect the bridge area into 20 segments"""
-    bisect(midpoint=0.0, number_of_segments=80, spacing=0.025)
+    
+    segments = 80
+    delta = bridge_area / segments
+    
+    bisect(midpoint=0.0, number_of_segments=segments, spacing=delta)
 
 def bend_object(selected_object):
     """apply the bend simple deform modifier"""
@@ -55,18 +70,13 @@ def bend_object(selected_object):
     
 def scale(value=100.0):
     """scale the object to 100x the size"""
-    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.transform.resize(value=(100.0, 100.0, 100.0)) #scale 100x for easier translations
 
-def find_mid_lens_point(selected_object, scale_factor=100.0):
-    """assume the middle of the lens is half way between the middle and one of the ends, find that point and multiply by the scale factor, because object scale does not apply the values to the vertices"""
-    mesh = selected_object.data
+def find_mid_lens_point(max_x_co):
+    """assume the middle of the lens is half way between the middle and one of the ends, find that point"""
     
-    print(mesh.vertices)
-    
-    max_x_co = max([vertex.co[0] for vertex in mesh.vertices])
-    
-    return max_x_co/2 * scale_factor
+    return max_x_co/2
         
 
 def bisect_mid_lens_areas(mid_lens_point):
@@ -77,16 +87,18 @@ def bisect_mid_lens_areas(mid_lens_point):
     for point in [left_lens_area, right_lens_area]:
         bisect(midpoint=point, number_of_segments=5, spacing=1.0)
         
-def select_mid_bridge_points(selected_object, delta=0.004):
-    """select the points around the middle section of the bridge, select only works if the mode is OBJECT while selecting, and then changed to EDIT for subsequent operations"""
+def select_mid_bridge_points(selected_object, delta=0.025):
+    """Select the points around the middle section of the bridge, select only works if the mode is OBJECT while selecting, and then changed to EDIT for subsequent operations. The delta should be the same value as the spacing in the bisect bridge"""
     
     bpy.ops.object.mode_set(mode="OBJECT")
     mesh = selected_object.data #mesh data of the selected object
     
+    region = delta * 3
+    
     #iterating through a lot of vertexes :(
     for vertex in mesh.vertices:
         x_co = vertex.co[0]
-        if (x_co >= -1 * delta) and (x_co <= delta):
+        if (x_co >= -1 * region) and (x_co <= region):
             vertex.select = True
             
 def deselect_all(selected_object):
@@ -100,7 +112,7 @@ def protrude_bridge():
     """translate the middle section of the bridge, with propotional selection"""
     bpy.ops.object.mode_set(mode="EDIT")
     
-    bpy.ops.transform.translate(value=(0.0, -0.4, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=0.7)
+    bpy.ops.transform.translate(value=(0.0, -0.4, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=1.0)
     
 
 def run():
@@ -120,8 +132,12 @@ def run():
     move_to_origin(selected_object)
 
     #the bisects help with future transforms and prevent distortions due to long faces
-    bisect_bridge_area()
-    mid_lens_point = find_mid_lens_point(selected_object)
+    max_x_co = find_max_x(selected_object)
+    
+    bridge_area = find_bridge_area(max_x_co)
+    bisect_bridge_area(bridge_area)
+    
+    mid_lens_point = find_mid_lens_point(max_x_co)
     bisect_mid_lens_areas(mid_lens_point)
     
     bend_object(selected_object)
