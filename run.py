@@ -28,6 +28,7 @@ def move_to_origin(selected_object):
 def bisect(midpoint, number_of_segments, spacing):
     """bisect area around the midpoint, based on the number of segments and spacing"""
     bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all()
 
     lower_range = int(-1 * number_of_segments/2)
     upper_range = int(number_of_segments/2 + 1)
@@ -46,8 +47,8 @@ def find_max_x(selected_object):
     return max_x_co
         
 def find_bridge_area(max_x_co):
-    """Suppose the bridge area is 16% of the entire length of the frame"""
-    return 0.14 * max_x_co * 2
+    """Suppose the bridge area is 16% of the entire length of the frame, only return half of that because it's split across the origin"""
+    return 0.14 * max_x_co
     
 
 def bisect_bridge_area(bridge_area):
@@ -122,6 +123,78 @@ def scale_to_lifesize(max_x_co, lifesize):
     
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.transform.resize(value=(scale, scale, scale))
+
+
+def find_key_values(selected_object, bridge_area):
+    mesh = selected_object.data
+    
+    bottom_of_bridge = 100
+    
+    front_points = {}
+    
+    bottom_of_nosepad_area = 100
+    
+    for vertex in mesh.vertices:
+        x,y,z = vertex.co
+        
+        #whole region:
+        if (x <= 2* bridge_area) and (x>= -2 * bridge_area):
+            
+            if (x <= bridge_area) and (x >= -1 * bridge_area):
+                if z <= bottom_of_bridge:
+                    bottom_of_bridge = z        
+            
+            if (y <= 0):
+                front_points[vertex.index] = (x,y,z)
+                
+            #suppose nosepad area is the same size as bridge area
+            if (x <= -1 * bridge_area) and (x >= -2 * bridge_area):
+                if (z <= bottom_of_nosepad_area):
+                    bottom_of_nosepad_area = z
+            #assume symmetry, so only need to check one side
+   
+    above_points = {}
+    
+    for vertex in mesh.vertices:
+        x,y,z = vertex.co
+        
+        #whole region:
+        if (x <= 2* bridge_area) and (x>= -2 * bridge_area):
+            if (z >= bottom_of_bridge):
+                above_points[vertex.index] = (x,y,z)
+    
+    return bottom_of_bridge, bottom_of_nosepad_area, [front_points]
+
+def select_nosepad_extrusion_points(bottom_of_bridge, bottom_of_nosepad, selected_object, bridge_area):
+    mesh = selected_object.data
+    bridge_area = bridge_area
+    
+    bpy.ops.object.mode_set(mode="OBJECT")
+    
+    extrude_region = bottom_of_bridge - 0.25 * (bottom_of_bridge - abs(bottom_of_nosepad))
+    delta = 0.15 * (bottom_of_bridge - bottom_of_nosepad)
+    
+    for vertex in mesh.vertices:
+        x,y,z = vertex.co
+        if (x <= -1 * bridge_area) and (x >= -2 * bridge_area):
+            if (z <= extrude_region + delta) and (z >= extrude_region - delta):
+                vertex.select = True
+        elif (x <= 2 * bridge_area) and (x >= bridge_area):
+            if (z <= extrude_region + delta) and (z >= extrude_region - delta):
+                vertex.select = True
+                
+def extrude_nosepad():
+    bpy.ops.object.mode_set(mode="EDIT")
+    
+    bpy.ops.transform.translate(value=(0.0, 1.0, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=2.5)
+
+def reset_norm(point_sets, selected_object):
+    mesh = selected_object.data
+    bpy.ops.object.mode_set(mode="OBJECT")
+    
+    for point_set in point_sets:
+        for index, coord in point_set.items():
+            mesh.vertices[index].co = coord
     
 
 def run(lifesize=120, protruded_bridge=True):
@@ -144,7 +217,18 @@ def run(lifesize=120, protruded_bridge=True):
     max_x_co = find_max_x(selected_object)
     
     bridge_area = find_bridge_area(max_x_co)
+    
+    #add nosepieces
+    deselect_all(selected_object)
+    bottom_of_bridge, bottom_of_nosepad, normal_points = find_key_values(selected_object, bridge_area)
+    select_nosepad_extrusion_points(bottom_of_bridge, bottom_of_nosepad, selected_object, bridge_area)
+    extrude_nosepad()
+    deselect_all(selected_object)
+    reset_norm(normal_points, selected_object)
+    
+    #swap
     bisect_bridge_area(bridge_area)
+    deselect_all(selected_object)
     
     mid_lens_point = find_mid_lens_point(max_x_co)
     bisect_mid_lens_areas(mid_lens_point, max_x_co)
@@ -155,9 +239,7 @@ def run(lifesize=120, protruded_bridge=True):
         #protrude the upper bridge region
         deselect_all(selected_object)
         select_mid_bridge_points(selected_object)
-        protrude_bridge()
-    
-    #nosepads
+        xprotrude_bridge()
     
     deselect_all(selected_object)
     scale_to_lifesize(max_x_co, lifesize)
