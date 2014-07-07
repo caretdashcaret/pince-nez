@@ -69,9 +69,9 @@ def bend_object(selected_object):
     bpy.ops.object.modifier_apply(apply_as="DATA", modifier="SimpleDeform") #apply modifier
     
 def scale(value=100.0):
-    """scale the object to 100x the size"""
+    """scale the object to 100x the size for easier manipulation"""
     bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.transform.resize(value=(100.0, 100.0, 100.0)) #scale 100x for easier translations
+    bpy.ops.transform.resize(value=(100.0, 100.0, 100.0))
 
 def find_mid_lens_point(max_x_co):
     """assume the middle of the lens is half way between the middle and one of the ends, find that point"""
@@ -79,13 +79,15 @@ def find_mid_lens_point(max_x_co):
     return max_x_co/2
         
 
-def bisect_mid_lens_areas(mid_lens_point):
+def bisect_mid_lens_areas(mid_lens_point, max_x_co):
     """bisect the area around the middle of each lens to lessen the artifacts of transformations"""
     left_lens_area = -1 * mid_lens_point
     right_lens_area = mid_lens_point
     
+    delta = 0.05 * max_x_co #5% of the width of half the frame
+    
     for point in [left_lens_area, right_lens_area]:
-        bisect(midpoint=point, number_of_segments=5, spacing=1.0)
+        bisect(midpoint=point, number_of_segments=7, spacing=delta)
         
 def select_mid_bridge_points(selected_object, delta=0.025):
     """Select the points around the middle section of the bridge, select only works if the mode is OBJECT while selecting, and then changed to EDIT for subsequent operations. The delta should be the same value as the spacing in the bisect bridge"""
@@ -114,8 +116,15 @@ def protrude_bridge():
     
     bpy.ops.transform.translate(value=(0.0, -0.4, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=1.0)
     
+def scale_to_lifesize(max_x_co, lifesize):
+    """Scale to the correct size for 3D printing. The scale is 1 STL unit = 1 mm"""
+    scale = lifesize / (max_x_co * 2) * 100
+    
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.transform.resize(value=(scale, scale, scale))
+    
 
-def run():
+def run(lifesize=120, protruded_bridge=True):
     selected_object = bpy.context.scene.objects.active #imported glasses
 
     extrude_curve(selected_object)
@@ -138,14 +147,24 @@ def run():
     bisect_bridge_area(bridge_area)
     
     mid_lens_point = find_mid_lens_point(max_x_co)
-    bisect_mid_lens_areas(mid_lens_point)
+    bisect_mid_lens_areas(mid_lens_point, max_x_co)
     
     bend_object(selected_object)
     
-    #protrude the upper bridge region
+    if protruded_bridge:
+        #protrude the upper bridge region
+        deselect_all(selected_object)
+        select_mid_bridge_points(selected_object)
+        protrude_bridge()
+    
+    #nosepads
+    
     deselect_all(selected_object)
-    select_mid_bridge_points(selected_object)
-    protrude_bridge()
+    scale_to_lifesize(max_x_co, lifesize)
+    
+    #fancy display to better visualize the changes
+    bpy.ops.object.mode_set(mode="OBJECT")
+    selected_object.data.materials[0].diffuse_color = (1.0, 1.0, 1.0)
 
 run()
 print("Success")
