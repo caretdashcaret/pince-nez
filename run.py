@@ -6,8 +6,8 @@ def extrude_curve(selected_object):
     
     path = selected_object.data #path data of the glasses
     
-    path.extrude = 0.005 #extrude path to create mesh
-    #path.bevel_depth = 0.001 #bevel the edges
+    path.extrude = 0.003 #extrude path to create mesh
+    path.bevel_depth = 0.001 #bevel the edges
 
     bpy.ops.object.convert(target='MESH', keep_original=False) #convert from curve to mesh
     
@@ -58,15 +58,26 @@ def scale(value=100.0):
     bpy.ops.object.mode_set(mode="OBJECT")
     bpy.ops.transform.resize(value=(100.0, 100.0, 100.0)) #scale 100x for easier translations
 
-def bisect_mid_lens_areas():
+def find_mid_lens_point(selected_object, scale_factor=100.0):
+    """assume the middle of the lens is half way between the middle and one of the ends, find that point and multiply by the scale factor, because object scale does not apply the values to the vertices"""
+    mesh = selected_object.data
+    
+    print(mesh.vertices)
+    
+    max_x_co = max([vertex.co[0] for vertex in mesh.vertices])
+    
+    return max_x_co/2 * scale_factor
+        
+
+def bisect_mid_lens_areas(mid_lens_point):
     """bisect the area around the middle of each lens to lessen the artifacts of transformations"""
-    left_lens_area = -8.0
-    right_lens_area = 8.0
+    left_lens_area = -1 * mid_lens_point
+    right_lens_area = mid_lens_point
     
     for point in [left_lens_area, right_lens_area]:
         bisect(midpoint=point, number_of_segments=5, spacing=1.0)
         
-def select_mid_bridge_points(selected_object, delta=0.0025):
+def select_mid_bridge_points(selected_object, delta=0.004):
     """select the points around the middle section of the bridge, select only works if the mode is OBJECT while selecting, and then changed to EDIT for subsequent operations"""
     
     bpy.ops.object.mode_set(mode="OBJECT")
@@ -110,7 +121,8 @@ def run():
 
     #the bisects help with future transforms and prevent distortions due to long faces
     bisect_bridge_area()
-    bisect_mid_lens_areas()
+    mid_lens_point = find_mid_lens_point(selected_object)
+    bisect_mid_lens_areas(mid_lens_point)
     
     bend_object(selected_object)
     
