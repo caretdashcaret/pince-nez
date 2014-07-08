@@ -7,7 +7,7 @@ def extrude_curve(selected_object):
     path = selected_object.data #path data of the glasses
     
     path.extrude = 0.003 #extrude path to create mesh
-    path.bevel_depth = 0.001 #bevel the edges
+    #path.bevel_depth = 0.001 #bevel the edges
 
     bpy.ops.object.convert(target='MESH', keep_original=False) #convert from curve to mesh
     
@@ -53,11 +53,15 @@ def find_bridge_area(max_x_co):
 
 def bisect_bridge_area(bridge_area):
     """bisect the bridge area into 20 segments"""
+    bpy.ops.object.mode_set(mode="EDIT")
+    #bpy.ops.mesh.select_all()
     
     segments = 80
     delta = bridge_area / segments
     
     bisect(midpoint=0.0, number_of_segments=segments, spacing=delta)
+    
+    bpy.ops.object.mode_set(mode="OBJECT") #need to toggle mode to confirm changes
 
 def bend_object(selected_object):
     """apply the bend simple deform modifier"""
@@ -178,10 +182,10 @@ def find_key_values(selected_object, bridge_area):
                 if height < bottom_of_nosepad_area:
                     bottom_of_nosepad_area = height
             
-            y_depth = vertex.co[1]
-            if y_depth <= 0:
-                x, y, z = vertex.co #extracted for immutability
-                front_points[vertex.index] = (x,y,z)
+        y_depth = vertex.co[1]
+        if y_depth <= 0: #future manipulations could affect a wider area than the region
+            x, y, z = vertex.co #extracted for immutability
+            front_points[vertex.index] = (x,y,z)
         
     return bottom_of_bridge, bottom_of_nosepad_area, [front_points], [left_nosepad_points, right_nosepad_points]
 
@@ -214,7 +218,7 @@ def extrude_nosepad():
 def scale_nosepad():
     bpy.ops.object.mode_set(mode="EDIT")
     
-    bpy.ops.transform.resize(value=(0.5, 1.0, 1.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=2.5)
+    bpy.ops.transform.shrink_fatten(value=0.2, proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=1.0)
 
 def reset_norm(point_sets, selected_object):
     mesh = selected_object.data
@@ -229,10 +233,24 @@ def remove_duplicate_vertexes(selected_object):
     
     bpy.ops.mesh.select_all()
     bpy.ops.mesh.remove_doubles(use_unselected=True)
+    bpy.ops.object.mode_set(mode="OBJECT") #need to switch modes for the remove doubles to apply
+    
+def select_all_nosepad_points(nosepad_points, upper_bound, selected_object):
+    bpy.ops.object.mode_set(mode="OBJECT")
+    
+    mesh = selected_object.data
+    
+    for index in nosepad_points:
+        vertex = mesh.vertices[index]
+        
+        height = vertex.co[2]
+        
+        if height < upper_bound:
+            vertex.select = True
 
 def run(lifesize=120, protruded_bridge=True):
     selected_object = bpy.context.scene.objects.active #imported glasses
-
+    
     extrude_curve(selected_object)
     
     #fancy display to better visualize the changes
@@ -252,11 +270,22 @@ def run(lifesize=120, protruded_bridge=True):
     
     #remove duplicate vertexes (like artifacts from converting paths to mesh and beveling)
     #this will weld the seams
+    deselect_all(selected_object)
     remove_duplicate_vertexes(selected_object)
-
+    
     max_x_co = find_max_x(selected_object)
     
     bridge_area = find_bridge_area(max_x_co)
+    
+    #the bisects help with future transforms and prevent distortions due to long faces
+    #bisect_bridge_area(bridge_area)
+    
+    #deselect_all(selected_object)
+    #remove_duplicate_vertexes(selected_object)
+    
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.bisect(plane_co=(0.0, 0.0, 0.0), plane_no=(1.0, 0.0, 0.0), threshold=0, xstart=0, xend=10, ystart=0, yend=100)
+    bpy.ops.object.mode_set(mode="OBJECT")
     
     #add nosepieces
     deselect_all(selected_object)
@@ -266,24 +295,28 @@ def run(lifesize=120, protruded_bridge=True):
     upper_nosepad_peak, lower_nosepad_peak = find_nosepad_peak_height(bottom_of_bridge, bottom_of_nosepad) 
     
     #left nosepad
-    
+    deselect_all(selected_object)
+    select_all_nosepad_points(left_nosepad_points, bottom_of_bridge, selected_object)
+    scale_nosepad()
+    deselect_all(selected_object)
     select_nosepad_extrusion_points(upper_nosepad_peak, lower_nosepad_peak, selected_object, left_nosepad_points)
     extrude_nosepad()
-    scale_nosepad()
     deselect_all(selected_object)
     
     #right nosepad
-    select_nosepad_extrusion_points(upper_nosepad_peak, lower_nosepad_peak, selected_object, right_nosepad_points)
-    extrude_nosepad()
+    deselect_all(selected_object)
+    select_all_nosepad_points(right_nosepad_points, bottom_of_bridge, selected_object)
     scale_nosepad()
     deselect_all(selected_object)
+    select_nosepad_extrusion_points(upper_nosepad_peak, lower_nosepad_peak, selected_object, right_nosepad_points)
+    extrude_nosepad()
     
-    reset_norm(normal_points, selected_object)
-        
-    #the bisects help with future transforms and prevent distortions due to long faces
-    bisect_bridge_area(bridge_area)
+    
     deselect_all(selected_object)
-        
+    reset_norm(normal_points, selected_object)
+    
+    bisect_bridge_area(bridge_area)
+    
     mid_lens_point = find_mid_lens_point(max_x_co)
     bisect_mid_lens_areas(mid_lens_point, max_x_co)
         
@@ -299,6 +332,7 @@ def run(lifesize=120, protruded_bridge=True):
     scale_to_lifesize(max_x_co, lifesize)
     
     bpy.ops.object.mode_set(mode="OBJECT")
+    
 
 run()
 print("Success")
