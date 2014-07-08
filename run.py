@@ -203,17 +203,13 @@ def select_nosepad_extrusion_points(upper_nosepad_peak, bottom_nosepad_peak, sel
         vertex = mesh.vertices[index]
         height = vertex.co[2]
         
-        #print(height)
-        
         if (height <= upper_nosepad_peak) and (height >= bottom_nosepad_peak):
-            print(index)
-            print('hi')
             vertex.select = True
                 
 def extrude_nosepad():
     bpy.ops.object.mode_set(mode="EDIT")
     
-    bpy.ops.transform.translate(value=(0.2, 1.0, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=2.5)
+    bpy.ops.transform.translate(value=(0.0, 1.0, 0.25), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=2.5)
     
 def scale_nosepad():
     bpy.ops.object.mode_set(mode="EDIT")
@@ -225,10 +221,14 @@ def reset_norm(point_sets, selected_object):
     bpy.ops.object.mode_set(mode="OBJECT")
     
     for point_set in point_sets:
-        print(point_set)
         for index, coord in point_set.items():
             mesh.vertices[index].co = coord
+
+def remove_duplicate_vertexes(selected_object):
+    bpy.ops.object.mode_set(mode="EDIT")
     
+    bpy.ops.mesh.select_all()
+    bpy.ops.mesh.remove_doubles(use_unselected=True)
 
 def run(lifesize=120, protruded_bridge=True):
     selected_object = bpy.context.scene.objects.active #imported glasses
@@ -249,6 +249,10 @@ def run(lifesize=120, protruded_bridge=True):
     scale()
     
     move_to_origin(selected_object)
+    
+    #remove duplicate vertexes (like artifacts from converting paths to mesh and beveling)
+    #this will weld the seams
+    remove_duplicate_vertexes(selected_object)
 
     max_x_co = find_max_x(selected_object)
     
@@ -262,16 +266,16 @@ def run(lifesize=120, protruded_bridge=True):
     upper_nosepad_peak, lower_nosepad_peak = find_nosepad_peak_height(bottom_of_bridge, bottom_of_nosepad) 
     
     #left nosepad
-    print(upper_nosepad_peak)
-    print(lower_nosepad_peak)
     
     select_nosepad_extrusion_points(upper_nosepad_peak, lower_nosepad_peak, selected_object, left_nosepad_points)
     extrude_nosepad()
+    scale_nosepad()
     deselect_all(selected_object)
     
     #right nosepad
     select_nosepad_extrusion_points(upper_nosepad_peak, lower_nosepad_peak, selected_object, right_nosepad_points)
     extrude_nosepad()
+    scale_nosepad()
     deselect_all(selected_object)
     
     reset_norm(normal_points, selected_object)
