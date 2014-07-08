@@ -14,7 +14,7 @@ def deselect_all_vertices():
     bpy.ops.mesh.select_all(action="DESELECT")
 
 
-def extrude_curve(path):
+def extrude_curve(path, bevel):
     """create the basic extrusion from curve"""
     bpy.ops.object.mode_set(mode="OBJECT")
     #move the object to the center
@@ -23,8 +23,9 @@ def extrude_curve(path):
     #extrude path to create mesh
     path.extrude = 0.003
     #bevel the edges
-    path.bevel_depth = 0.001
-
+    if bevel:
+        path.bevel_depth = 0.002
+    
     #convert from curve to mesh
     bpy.ops.object.convert(target='MESH', keep_original=False)
 
@@ -176,13 +177,13 @@ def in_bridge_area(vertex, bridge_area):
     return (x <= bridge_area/2) and (x >= -1 * bridge_area/2)
 
 
-def in_left_nosepad_area(vertex, bridge_area):
+def in_right_nosepad_area(vertex, bridge_area):
     x,y,z = vertex.co
     
     return (x<= -1 * bridge_area/2) and (x >= -1 * bridge_area * 3/2)
 
 
-def in_right_nosepad_area(vertex, bridge_area):
+def in_left_nosepad_area(vertex, bridge_area):
     x,y,z = vertex.co
     
     return (x<= bridge_area * 3/2) and (x >= bridge_area/2)
@@ -200,7 +201,7 @@ def find_nosepads_values(mesh, bridge_area):
     suppose each nosepad area is the same width as the bridge area
 
     the bottom_of_bridge and bottom_of_nosepad are used to calculate how high (z) is the peak from the bottom
-    left_nosepad_vertices and right_nosepad_vertices are vertices in the region of the left and right nosepads
+    right_nosepad_vertices and left_nosepad_vertices are vertices in the region of the left and right nosepads
 
     front_vertices are vertices that may be changed by the transformations that create the nosepads
     and have to be reverted. I think it's easier to revert the changes, than computing a gaussian for figuring out
@@ -210,8 +211,8 @@ def find_nosepads_values(mesh, bridge_area):
     bottom_of_bridge = 100
     bottom_of_nosepad = 100
     
-    left_nosepad_vertices = []
     right_nosepad_vertices = []
+    left_nosepad_vertices = []
 
     front_vertices = {}
     
@@ -222,17 +223,17 @@ def find_nosepads_values(mesh, bridge_area):
                 if height < bottom_of_bridge:
                     bottom_of_bridge = height
             
-            if in_left_nosepad_area(vertex, bridge_area):
+            if in_right_nosepad_area(vertex, bridge_area):
                 #need to store index otherwise can't perform vertex selections due to
                 #loss of reference-of-objects?
-                left_nosepad_vertices.append(vertex.index)
+                right_nosepad_vertices.append(vertex.index)
                 #assume the frame is symmetrical, so only need to get the value from one side
                 height = vertex.co[2]
                 if height < bottom_of_nosepad:
                     bottom_of_nosepad = height
             
-            if in_right_nosepad_area(vertex, bridge_area):
-                right_nosepad_vertices.append(vertex.index)
+            if in_left_nosepad_area(vertex, bridge_area):
+                left_nosepad_vertices.append(vertex.index)
             
         y_depth = vertex.co[1]
          #future manipulations could affect a wider area than the region
@@ -241,7 +242,7 @@ def find_nosepads_values(mesh, bridge_area):
             x, y, z = vertex.co
             front_vertices[vertex.index] = (x,y,z)
         
-    return [bottom_of_bridge, bottom_of_nosepad], front_vertices, [left_nosepad_vertices, right_nosepad_vertices]
+    return [bottom_of_bridge, bottom_of_nosepad], front_vertices, [right_nosepad_vertices, left_nosepad_vertices]
 
 
 def find_nosepad_peak_height(nosepad_z_height_range):
@@ -251,8 +252,8 @@ def find_nosepad_peak_height(nosepad_z_height_range):
     
     distance = bottom_of_bridge - bottom_of_nosepad
     
-    peak = bottom_of_bridge - 0.5 * distance
-    delta = 0.15 * distance
+    peak = bottom_of_bridge - 0.4 * distance
+    delta = 0.05 * distance
     
     return peak + delta, peak - delta
 
@@ -337,7 +338,7 @@ def move_object_origin_to_center_of_mass():
     bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS")
 
 
-def run(lifesize=120, protruded_bridge=True):
+def run(lifesize=120, protruded_bridge=True, bevel=True):
     """
     lifesize is the width of the frame, where 1 STL unit = 1 mm
     protruded_bridge is a toggle for where the bridge should be protruded
@@ -349,7 +350,7 @@ def run(lifesize=120, protruded_bridge=True):
     path = selected_object.data
 
     #create a 3D mesh from the 2D path
-    extrude_curve(path)
+    extrude_curve(path, bevel)
     #after the 2D to 3D conversion, the data will be mesh data
     mesh = selected_object.data
     
@@ -384,19 +385,19 @@ def run(lifesize=120, protruded_bridge=True):
     #calculate information necessary for nosepads
     nosepad_z_height_range, normal_vertices, nosepad_vertices = find_nosepads_values(mesh, bridge_area)
     
-    left_nosepad_vertex_indices, right_nosepad_vertex_indices = nosepad_vertices
+    right_nosepad_vertex_indices, left_nosepad_vertex_indices = nosepad_vertices
     nosepad_peak_z_height_range = find_nosepad_peak_height(nosepad_z_height_range)
     
     #create left nosepad
-    select_all_nosepad_vertices(left_nosepad_vertex_indices, nosepad_z_height_range, mesh)
-    shrink_nosepad()
-    select_nosepad_peak_vertices(nosepad_peak_z_height_range, left_nosepad_vertex_indices, mesh)
-    extrude_nosepad_peak()
-    
-    #create right nosepad
     select_all_nosepad_vertices(right_nosepad_vertex_indices, nosepad_z_height_range, mesh)
     shrink_nosepad()
     select_nosepad_peak_vertices(nosepad_peak_z_height_range, right_nosepad_vertex_indices, mesh)
+    extrude_nosepad_peak()
+    
+    #create right nosepad
+    select_all_nosepad_vertices(left_nosepad_vertex_indices, nosepad_z_height_range, mesh)
+    shrink_nosepad()
+    select_nosepad_peak_vertices(nosepad_peak_z_height_range, left_nosepad_vertex_indices, mesh)
     extrude_nosepad_peak()
 
     #reset all undesired manipulations from proportional editing
@@ -419,9 +420,12 @@ def run(lifesize=120, protruded_bridge=True):
 
     scale_to_lifesize(half_length, lifesize)
 
+    #remove artifacts / cleanup
+    remove_duplicate_vertices()
+    
     #end in object mode for better viewing
     bpy.ops.object.mode_set(mode="OBJECT")
 
     print("O-O success!")
-
+    
 run()
