@@ -124,6 +124,25 @@ def scale_to_lifesize(max_x_co, lifesize):
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.transform.resize(value=(scale, scale, scale))
 
+def in_bridge_area(vertex, bridge_area):
+    x,y,z = vertex.co
+    
+    return (x <= bridge_area/2) and (x >= -1 * bridge_area/2)
+
+def in_left_nosepad_area(vertex, bridge_area):
+    x,y,z = vertex.co
+    
+    return (x<= -1 * bridge_area/2) and (x >= -1 * bridge_area * 3/2)
+
+def in_right_nosepad_area(vertex, bridge_area):
+    x,y,z = vertex.co
+    
+    return (x<= bridge_area * 3/2) and (x >= bridge_area/2)
+
+def in_nosepad_bridge_region(vertex, bridge_area):
+    x,y,z = vertex.co
+    
+    return (x<= 2*bridge_area) and (x >= -2 * bridge_area)
 
 def find_key_values(selected_object, bridge_area):
     mesh = selected_object.data
@@ -134,65 +153,79 @@ def find_key_values(selected_object, bridge_area):
     
     bottom_of_nosepad_area = 100
     
+    left_nosepad_points = []
+    right_nosepad_points = []
+    
+    #left nosepad --- bridge area --- right nosepad
+    #suppose each nosepad area is the same as bridge area
+    
     for vertex in mesh.vertices:
-        x,y,z = vertex.co
-        
-        #whole region:
-        if (x <= 2* bridge_area) and (x>= -2 * bridge_area):
+        if in_nosepad_bridge_region(vertex, bridge_area):
+            if in_bridge_area(vertex, bridge_area):
+                height = vertex.co[2]
+                if height < bottom_of_bridge:
+                    bottom_of_bridge = height
             
-            if (x <= bridge_area) and (x >= -1 * bridge_area):
-                if z <= bottom_of_bridge:
-                    bottom_of_bridge = z        
+            if in_left_nosepad_area(vertex, bridge_area):
+                left_nosepad_points.append(vertex.index)
+                height = vertex.co[2]
+                if height < bottom_of_nosepad_area:
+                    bottom_of_nosepad_area = height
             
-            if (y <= 0):
+            if in_right_nosepad_area(vertex, bridge_area):
+                right_nosepad_points.append(vertex.index)
+                height = vertex.co[2]
+                if height < bottom_of_nosepad_area:
+                    bottom_of_nosepad_area = height
+            
+            y_depth = vertex.co[1]
+            if y_depth <= 0:
+                x, y, z = vertex.co #extracted for immutability
                 front_points[vertex.index] = (x,y,z)
-                
-            #suppose nosepad area is the same size as bridge area
-            if (x <= -1 * bridge_area) and (x >= -2 * bridge_area):
-                if (z <= bottom_of_nosepad_area):
-                    bottom_of_nosepad_area = z
-            #assume symmetry, so only need to check one side
-   
-    above_points = {}
-    
-    for vertex in mesh.vertices:
-        x,y,z = vertex.co
         
-        #whole region:
-        if (x <= 2* bridge_area) and (x>= -2 * bridge_area):
-            if (z >= bottom_of_bridge):
-                above_points[vertex.index] = (x,y,z)
-    
-    return bottom_of_bridge, bottom_of_nosepad_area, [front_points]
+    return bottom_of_bridge, bottom_of_nosepad_area, [front_points], [left_nosepad_points, right_nosepad_points]
 
-def select_nosepad_extrusion_points(bottom_of_bridge, bottom_of_nosepad, selected_object, bridge_area):
+def find_nosepad_peak_height(bottom_of_bridge, bottom_of_nosepad):
+    
+    distance = bottom_of_bridge - bottom_of_nosepad
+    
+    peak = bottom_of_bridge - 0.5 * distance
+    delta = 0.15 * distance
+    
+    return peak + delta, peak - delta
+
+def select_nosepad_extrusion_points(upper_nosepad_peak, bottom_nosepad_peak, selected_object, nosepad_points):
     mesh = selected_object.data
-    bridge_area = bridge_area
     
     bpy.ops.object.mode_set(mode="OBJECT")
     
-    extrude_region = bottom_of_bridge - 0.25 * (bottom_of_bridge - abs(bottom_of_nosepad))
-    delta = 0.15 * (bottom_of_bridge - bottom_of_nosepad)
-    
-    for vertex in mesh.vertices:
-        x,y,z = vertex.co
-        if (x <= -1 * bridge_area) and (x >= -2 * bridge_area):
-            if (z <= extrude_region + delta) and (z >= extrude_region - delta):
-                vertex.select = True
-        elif (x <= 2 * bridge_area) and (x >= bridge_area):
-            if (z <= extrude_region + delta) and (z >= extrude_region - delta):
-                vertex.select = True
+    for index in nosepad_points:
+        vertex = mesh.vertices[index]
+        height = vertex.co[2]
+        
+        #print(height)
+        
+        if (height <= upper_nosepad_peak) and (height >= bottom_nosepad_peak):
+            print(index)
+            print('hi')
+            vertex.select = True
                 
 def extrude_nosepad():
     bpy.ops.object.mode_set(mode="EDIT")
     
-    bpy.ops.transform.translate(value=(0.0, 1.0, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=2.5)
+    bpy.ops.transform.translate(value=(0.2, 1.0, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=2.5)
+    
+def scale_nosepad():
+    bpy.ops.object.mode_set(mode="EDIT")
+    
+    bpy.ops.transform.resize(value=(0.5, 1.0, 1.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=2.5)
 
 def reset_norm(point_sets, selected_object):
     mesh = selected_object.data
     bpy.ops.object.mode_set(mode="OBJECT")
     
     for point_set in point_sets:
+        print(point_set)
         for index, coord in point_set.items():
             mesh.vertices[index].co = coord
     
@@ -201,6 +234,10 @@ def run(lifesize=120, protruded_bridge=True):
     selected_object = bpy.context.scene.objects.active #imported glasses
 
     extrude_curve(selected_object)
+    
+    #fancy display to better visualize the changes
+    bpy.ops.object.mode_set(mode="OBJECT")
+    selected_object.data.materials[0].diffuse_color = (1.0, 1.0, 1.0)
 
     #Since Bend only bends around the Z axis, the glasses have to be rotated. It needs to be rotated in EDIT mode otherwise the Z will be relative to the original mesh.
     rotate_object()
@@ -213,40 +250,51 @@ def run(lifesize=120, protruded_bridge=True):
     
     move_to_origin(selected_object)
 
-    #the bisects help with future transforms and prevent distortions due to long faces
     max_x_co = find_max_x(selected_object)
     
     bridge_area = find_bridge_area(max_x_co)
     
     #add nosepieces
     deselect_all(selected_object)
-    bottom_of_bridge, bottom_of_nosepad, normal_points = find_key_values(selected_object, bridge_area)
-    select_nosepad_extrusion_points(bottom_of_bridge, bottom_of_nosepad, selected_object, bridge_area)
+    bottom_of_bridge, bottom_of_nosepad, normal_points, nosepad_points = find_key_values(selected_object, bridge_area)
+    
+    left_nosepad_points, right_nosepad_points = nosepad_points
+    upper_nosepad_peak, lower_nosepad_peak = find_nosepad_peak_height(bottom_of_bridge, bottom_of_nosepad) 
+    
+    #left nosepad
+    print(upper_nosepad_peak)
+    print(lower_nosepad_peak)
+    
+    select_nosepad_extrusion_points(upper_nosepad_peak, lower_nosepad_peak, selected_object, left_nosepad_points)
     extrude_nosepad()
     deselect_all(selected_object)
-    reset_norm(normal_points, selected_object)
     
-    #swap
-    bisect_bridge_area(bridge_area)
+    #right nosepad
+    select_nosepad_extrusion_points(upper_nosepad_peak, lower_nosepad_peak, selected_object, right_nosepad_points)
+    extrude_nosepad()
     deselect_all(selected_object)
     
+    reset_norm(normal_points, selected_object)
+        
+    #the bisects help with future transforms and prevent distortions due to long faces
+    bisect_bridge_area(bridge_area)
+    deselect_all(selected_object)
+        
     mid_lens_point = find_mid_lens_point(max_x_co)
     bisect_mid_lens_areas(mid_lens_point, max_x_co)
-    
+        
     bend_object(selected_object)
-    
+        
     if protruded_bridge:
         #protrude the upper bridge region
         deselect_all(selected_object)
         select_mid_bridge_points(selected_object)
-        xprotrude_bridge()
-    
+        protrude_bridge()
+        
     deselect_all(selected_object)
     scale_to_lifesize(max_x_co, lifesize)
     
-    #fancy display to better visualize the changes
     bpy.ops.object.mode_set(mode="OBJECT")
-    selected_object.data.materials[0].diffuse_color = (1.0, 1.0, 1.0)
 
 run()
 print("Success")
