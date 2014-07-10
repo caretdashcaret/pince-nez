@@ -2,7 +2,7 @@
 A simple script to procedurally generate 3D printable eyeglasses frames from an SVG.
 
 The order of operations is in the run method.
-In addtion to the arguments, run expects a SVG to be loaded and selected in Blender.
+In addition to the arguments, run expects a SVG to be loaded and selected in Blender.
 """
 import bpy
 
@@ -14,7 +14,7 @@ def deselect_all_vertices():
     bpy.ops.mesh.select_all(action="DESELECT")
 
 
-def extrude_curve(path, bevel):
+def extrude_curve(path, bevel, make_thin):
     """create the basic extrusion from curve"""
     bpy.ops.object.mode_set(mode="OBJECT")
     #move the object to the center
@@ -25,6 +25,10 @@ def extrude_curve(path, bevel):
     #bevel the edges
     if bevel:
         path.bevel_depth = 0.002
+        #path offset will create a thinner frame since beveling thickens it
+        #however, may create artifacts if the SVG is too thin
+        if make_thin:
+            path.offset = -0.001
     
     #convert from curve to mesh
     bpy.ops.object.convert(target='MESH', keep_original=False)
@@ -338,7 +342,7 @@ def move_object_origin_to_center_of_mass():
     bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS")
 
 
-def run(lifesize=120, protruded_bridge=True, bevel=True):
+def run(lifesize=120, protruded_bridge=True, bevel=True, make_thin=True):
     """
     lifesize is the width of the frame, where 1 STL unit = 1 mm
     protruded_bridge is a toggle for where the bridge should be protruded
@@ -350,7 +354,7 @@ def run(lifesize=120, protruded_bridge=True, bevel=True):
     path = selected_object.data
 
     #create a 3D mesh from the 2D path
-    extrude_curve(path, bevel)
+    extrude_curve(path, bevel, make_thin)
     #after the 2D to 3D conversion, the data will be mesh data
     mesh = selected_object.data
     
