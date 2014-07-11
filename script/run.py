@@ -25,6 +25,7 @@ def extrude_curve(path, bevel, make_thin):
     #bevel the edges
     if bevel:
         path.bevel_depth = 0.002
+        path.bevel_resolution = 2
         #path offset will create a thinner frame since beveling thickens it
         #however, may create artifacts if the SVG is too thin
         if make_thin:
