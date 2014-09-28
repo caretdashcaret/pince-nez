@@ -48,7 +48,7 @@ def move_to_origin(selected_object):
     selected_object.location = (0.0, 0.0, 0.0)
   
     
-def bisect(midpoint, number_of_segments, spacing):
+def bisect_midpoints(midpoint, number_of_segments, spacing):
     """bisect area around an midpoint, based on the number of segments and spacing"""
     bpy.ops.object.mode_set(mode="EDIT")
 
@@ -58,15 +58,7 @@ def bisect(midpoint, number_of_segments, spacing):
     bisection_points = [x * spacing + midpoint for x in spread]
 
     for x_coord in bisection_points:
-        bpy.ops.mesh.select_all(action="DESELECT")
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.mesh.bisect(plane_co=(x_coord, 0.0, 0.0),
-                            plane_no=(1.0, 0.0, 0.0),
-                            threshold=0,
-                            xstart=0,
-                            xend=10,
-                            ystart=0,
-                            yend=100)
+        bisect(x_coord)
 
 
 def find_half_length(mesh):
@@ -91,7 +83,7 @@ def bisect_bridge_area(bridge_area):
     segments = 80
     delta = bridge_area / segments
     
-    bisect(midpoint=0.0, number_of_segments=segments, spacing=delta)
+    bisect_midpoints(midpoint=0.0, number_of_segments=segments, spacing=delta)
 
     #the operation actually requires a mode change to take effect
     bpy.ops.object.mode_set(mode="OBJECT")
@@ -322,11 +314,7 @@ def select_all_nosepad_vertices(nosepad_vertex_indices, nosepad_z_height_range, 
 
 def bisect_origin():
     """splits down the origin"""
-    deselect_all_vertices()
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="SELECT")
-
-    bpy.ops.mesh.bisect(plane_co=(0.0, 0.0, 0.0), plane_no=(1.0, 0.0, 0.0), threshold=0, xstart=0, xend=10, ystart=0, yend=100)
+    bisect(0.0)
 
 
 def move_object_origin_to_center_of_mass():
@@ -356,6 +344,9 @@ def create_mesh_from_svg(selected_object, desired_width, extrude_amount):
     mesh = selected_object.data
 
     change_mesh_color_for_better_visualization(selected_object)
+
+    #clean up by wielding the sides together
+    remove_duplicate_vertices()
 
     return mesh
 
@@ -412,7 +403,96 @@ def change_mesh_color_for_better_visualization(selected_object):
     selected_object.data.materials[0].diffuse_color = (1.0, 1.0, 1.0)
 
 
-def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5):
+def reorient_for_easier_manipulation(selected_object):
+
+    #since Bend only bends around the Z axis, the frame have to be rotated.
+    rotate_object()
+
+    #for some reason there's a translation that happens that offsets the object origin
+    move_object_origin_to_center_of_mass()
+
+    #move to global origin so that it's easy to know where the center is
+    move_to_origin(selected_object)
+
+
+def create_nosepads(selected_object):
+    #bisect middle to lessen artifacts from creating nosepads
+    #the bisect_bridge_area method isn't called here, because that increases artifacts when scaling the nosepads
+    #it's a delicate balance
+    bisect_origin()
+
+    #create_left_nosepad()
+    #create_right_nosepad()
+
+
+def bend_lens_areas(bridge_width, bend_degree):
+
+    bridge_object, left_lens_object, right_lens_object = duplicate_object(2)
+    separate_left_lens_area(left_lens_object, bridge_width)
+    separate_right_lens_area(right_lens_object, bridge_width)
+    cut_bridge(bridge_object, bridge_width)
+
+
+def select_object(object):
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.context.scene.objects.active = object
+    object.select = True
+
+
+def duplicate_object(number_of_duplicates):
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked": False, "mode":"TRANSLATION"},
+                                  TRANSFORM_OT_translate={"value":(0.0,0.0,0.0)})
+    bpy.ops.object.duplicate_move()
+
+    return bpy.context.scene.objects[0], bpy.context.scene.objects[1], bpy.context.scene.objects[2]
+
+
+def bisect(x_coord, clear_inner=False, clear_outer=False, z_tilt=0.0):
+    """bisect at the x coordinate"""
+    deselect_all_vertices()
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+
+    bpy.ops.mesh.bisect(plane_co=(x_coord, 0.0, 0.0),
+                        plane_no=(1.0, 0.0, z_tilt),
+                        threshold=0,
+                        xstart=0,
+                        xend=10,
+                        ystart=0,
+                        yend=100,
+                        clear_inner=clear_inner,
+                        clear_outer=clear_outer)
+
+
+def separate_left_lens_area(left_lens_object, bridge_width):
+    print("left")
+    select_object(left_lens_object)
+    left_bridge_boundary_from_bridge = -1.0 * bridge_width / 2.0
+    bisect(left_bridge_boundary_from_bridge, clear_outer=True, z_tilt=0.3)
+
+
+def separate_right_lens_area(right_lens_object, bridge_width):
+    print("right")
+    select_object(right_lens_object)
+    right_bridge_boundary_from_bridge = bridge_width / 2.0
+    bisect(right_bridge_boundary_from_bridge, clear_inner=True, z_tilt=-0.3)
+
+
+def cut_bridge(bridge_object, bridge_width):
+
+    select_object(bridge_object)
+    left_bridge_boundary_from_bridge = -1.0 * bridge_width / 2.0
+    bisect(left_bridge_boundary_from_bridge, clear_inner=True, z_tilt=0.3)
+
+    right_bridge_boundary_from_bridge = bridge_width / 2.0
+    bisect(right_bridge_boundary_from_bridge, clear_outer=True, z_tilt=-0.3)
+
+
+
+def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5, bridge_width=10, bend_degree=20):
     """
     Scale is in mm
     :param desired_width: is the width prior to curving the lens area
@@ -424,6 +504,11 @@ def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5):
 
     mesh = create_mesh_from_svg(selected_object, desired_width, desired_thickness)
 
+    reorient_for_easier_manipulation(selected_object)
+
+    bend_lens_areas(bridge_width, bend_degree)
+
+    #create_nosepads(selected_object)
 
 
 create_eyeglasses_from_svg()
