@@ -14,23 +14,18 @@ def deselect_all_vertices():
     bpy.ops.mesh.select_all(action="DESELECT")
 
 
-def extrude_curve(path, bevel, make_thin):
+def extrude_curve(selected_object, extrude_amount):
     """create the basic extrusion from curve"""
-    bpy.ops.object.mode_set(mode="OBJECT")
-    #move the object to the center
-    bpy.ops.object.origin_set(type="GEOMETRY_ORIGIN")
+
+    #path data associated with the SVG
+    path = selected_object.data
+
+    #default extrusion is in meters so will need to be converted
+    extrude_amount_in_mm = extrude_amount / 1000
 
     #extrude path to create mesh
-    path.extrude = 0.003
-    #bevel the edges
-    if bevel:
-        path.bevel_depth = 0.002
-        path.bevel_resolution = 2
-        #path offset will create a thinner frame since beveling thickens it
-        #however, may create artifacts if the SVG is too thin
-        if make_thin:
-            path.offset = -0.001
-    
+    path.extrude = extrude_amount_in_mm
+
     #convert from curve to mesh
     bpy.ops.object.convert(target='MESH', keep_original=False)
 
@@ -343,22 +338,111 @@ def move_object_origin_to_center_of_mass():
     bpy.ops.object.origin_set(type="ORIGIN_CENTER_OF_MASS")
 
 
-def run(lifesize=120, protruded_bridge=True, bevel=True, make_thin=True):
+def setup_environment():
     """
-    lifesize is the width of the frame, where 1 STL unit = 1 mm
+    Sets up the scene with 1 Blender unit as 1 mm
+    """
+    bpy.context.scene.unit_settings.system = 'METRIC'
+
+
+def create_mesh_from_svg(selected_object, desired_width, extrude_amount):
+    """
+    Creates a 3D mesh from the imported 2D SVG
+    """
+    scale_svg_to_lifesize(selected_object, desired_width)
+
+    extrude_curve(selected_object, extrude_amount)
+
+    mesh = selected_object.data
+
+    change_mesh_color_for_better_visualization(selected_object)
+
+    return mesh
+
+
+def get_svg_width(selected_svg_object):
+
+    absolute_bounding_box = selected_svg_object.dimensions
+    width = absolute_bounding_box[0]
+    return width
+
+
+def compute_scaling_factor(svg_width, desired_width):
+
+    return desired_width / svg_width
+
+
+def compute_svg_scaling_factor(selected_svg_object, desired_width):
+
+    svg_width = get_svg_width(selected_svg_object)
+    scaling_factor = compute_scaling_factor(svg_width, desired_width)
+    return scaling_factor
+
+
+def move_svg_to_origin_for_scaling():
+    """
+    Moves the SVG Object to origin to prevent non-uniform scaling
+    """
+    bpy.ops.object.mode_set(mode="OBJECT")
+    #move the object to origin
+    bpy.ops.object.origin_set(type="GEOMETRY_ORIGIN")
+
+
+def scale_svg_using_scaling_factor(scaling_factor):
+
+    move_svg_to_origin_for_scaling()
+
+    #scale
+    bpy.ops.transform.resize(value=(scaling_factor,scaling_factor, scaling_factor))
+
+
+def scale_svg_to_lifesize(selected_svg_object, desired_width):
+    """
+    Scale the svg to desired lifesize width
+    """
+
+    scaling_factor = compute_svg_scaling_factor(selected_svg_object, desired_width)
+
+    scale_svg_using_scaling_factor(scaling_factor)
+
+
+def change_mesh_color_for_better_visualization(selected_object):
+
+    #fancy display to better visualize the changes
+    selected_object.data.materials[0].diffuse_color = (1.0, 1.0, 1.0)
+
+
+def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5):
+    """
+    Scale is in mm
+    :param desired_width: is the width prior to curving the lens area
+    """
+
+    setup_environment()
+
+    selected_object = bpy.context.scene.objects.active
+
+    mesh = create_mesh_from_svg(selected_object, desired_width, desired_thickness)
+
+
+
+create_eyeglasses_from_svg()
+
+
+def run(width=135, protruded_bridge=True, thickness=4.2):
+    """
+    width is the width of the frame, in mm
+    thickness is the thickness of the frame, in mm
     protruded_bridge is a toggle for where the bridge should be protruded
     """
 
+    setup_environment()
+
     #imported SVG of eyeglasses frame
     selected_object = bpy.context.scene.objects.active
-    #path data associated with the SVG
-    path = selected_object.data
 
-    #create a 3D mesh from the 2D path
-    extrude_curve(path, bevel, make_thin)
-    #after the 2D to 3D conversion, the data will be mesh data
-    mesh = selected_object.data
-    
+    mesh = create_mesh_from_svg(selected_object)
+
     #fancy display to better visualize the changes
     selected_object.data.materials[0].diffuse_color = (1.0, 1.0, 1.0)
 
@@ -415,7 +499,7 @@ def run(lifesize=120, protruded_bridge=True, bevel=True, make_thin=True):
     mid_lens_coord = find_mid_lens_coord(half_length)
     bisect_mid_lens_areas(mid_lens_coord, half_length)
 
-    #bend the frame slightly
+    #bend the frame slightly around each lens
     bend_object(selected_object)
         
     if protruded_bridge:
@@ -423,7 +507,7 @@ def run(lifesize=120, protruded_bridge=True, bevel=True, make_thin=True):
         select_mid_bridge_points(mesh)
         protrude_bridge()
 
-    scale_to_lifesize(half_length, lifesize)
+    scale_to_lifesize(half_length, width)
 
     #remove artifacts / cleanup
     remove_duplicate_vertices()
@@ -432,5 +516,3 @@ def run(lifesize=120, protruded_bridge=True, bevel=True, make_thin=True):
     bpy.ops.object.mode_set(mode="OBJECT")
 
     print("O-O success!")
-    
-run()
