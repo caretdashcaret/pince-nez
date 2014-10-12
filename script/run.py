@@ -89,7 +89,7 @@ def bisect_bridge_area(bridge_area):
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
-def bend_object(selected_object):
+def bend_object(selected_object, bend_degree):
     """apply the bend simple deform modifier"""
     bpy.ops.object.mode_set(mode="OBJECT")
 
@@ -98,8 +98,7 @@ def bend_object(selected_object):
     simple_deform_modifier = selected_object.modifiers["SimpleDeform"]
     simple_deform_modifier.deform_method = "BEND"
 
-    #Bend 25 degrees, or 0.436332 radians
-    simple_deform_modifier.angle = 0.436332
+    simple_deform_modifier.angle = bend_degree
 
     #Apply modifier
     bpy.ops.object.modifier_apply(apply_as="DATA", modifier="SimpleDeform")
@@ -425,11 +424,11 @@ def create_nosepads(selected_object):
     #create_right_nosepad()
 
 
-def bend_lens_areas(bridge_width, bend_degree):
+def form_lens_and_bridge(bridge_width, bend_degree):
 
     bridge_object, left_lens_object, right_lens_object = duplicate_object(2)
-    separate_left_lens_area(left_lens_object, bridge_width)
-    separate_right_lens_area(right_lens_object, bridge_width)
+    form_left_lens_area(left_lens_object, bridge_width, bend_degree)
+    form_right_lens_area(right_lens_object, bridge_width, bend_degree)
     cut_bridge(bridge_object, bridge_width)
 
 
@@ -467,15 +466,53 @@ def bisect(x_coord, clear_inner=False, clear_outer=False, z_tilt=0.0):
                         clear_outer=clear_outer)
 
 
+def form_left_lens_area(left_lens_object, bridge_width, bend_degree):
+    separate_left_lens_area(left_lens_object, bridge_width)
+    bend_lens_area(left_lens_object, bend_degree)
+
+
+def form_right_lens_area(right_lens_object, bridge_width, bend_degree):
+    separate_right_lens_area(right_lens_object, bridge_width)
+    bend_lens_area(right_lens_object, bend_degree)
+
+
+def bend_lens_area(lens_object, bend_degree):
+    select_object(lens_object)
+    move_object_origin_to_center_of_mass()
+    increase_resolution_for_bending(lens_object)
+    bend_object(lens_object, bend_degree)
+
+
+def increase_resolution_for_bending(lens_object):
+    select_object(lens_object)
+    #we bisect here because loopcuts don't work
+    bisect_to_increase_edge_loops(center=lens_object.location[0],
+                                  width=lens_object.dimensions[0] * 0.75,
+                                  number_of_loops=13)
+
+
+def bisect_to_increase_edge_loops(center, width, number_of_loops):
+    bpy.ops.object.mode_set(mode="EDIT")
+
+    lower_range = int(-1 * number_of_loops/2)
+    upper_range = int(number_of_loops/2 + 1)
+    spread = range(lower_range, upper_range)
+
+    spacing = width / number_of_loops
+
+    bisection_points = [x * spacing + center for x in spread]
+
+    for x_coord in bisection_points:
+        bisect(x_coord)
+
+
 def separate_left_lens_area(left_lens_object, bridge_width):
-    print("left")
     select_object(left_lens_object)
     left_bridge_boundary_from_bridge = -1.0 * bridge_width / 2.0
     bisect(left_bridge_boundary_from_bridge, clear_outer=True, z_tilt=0.3)
 
 
 def separate_right_lens_area(right_lens_object, bridge_width):
-    print("right")
     select_object(right_lens_object)
     right_bridge_boundary_from_bridge = bridge_width / 2.0
     bisect(right_bridge_boundary_from_bridge, clear_inner=True, z_tilt=-0.3)
@@ -491,11 +528,11 @@ def cut_bridge(bridge_object, bridge_width):
     bisect(right_bridge_boundary_from_bridge, clear_outer=True, z_tilt=-0.3)
 
 
-
-def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5, bridge_width=10, bend_degree=20):
+def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5, bridge_width=10, bend_degree=0.2618):
     """
     Scale is in mm
     :param desired_width: is the width prior to curving the lens area
+    :param bend_degree: the degree of the bend in radians
     """
 
     setup_environment()
@@ -506,7 +543,7 @@ def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5, bridge_
 
     reorient_for_easier_manipulation(selected_object)
 
-    bend_lens_areas(bridge_width, bend_degree)
+    form_lens_and_bridge(bridge_width, bend_degree)
 
     #create_nosepads(selected_object)
 
