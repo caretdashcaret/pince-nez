@@ -5,7 +5,7 @@ The order of operations is in the run method.
 In addition to the arguments, run expects a SVG to be loaded and selected in Blender.
 """
 import bpy
-
+import bmesh
 
 def deselect_all_vertices():
     """certain operations will leave vertices selected which will interfere with subsequent operations.
@@ -429,7 +429,17 @@ def form_lens_and_bridge(bridge_width, bend_degree):
     bridge_object, left_lens_object, right_lens_object = duplicate_object(2)
     form_left_lens_area(left_lens_object, bridge_width, bend_degree)
     form_right_lens_area(right_lens_object, bridge_width, bend_degree)
-    cut_bridge(bridge_object, bridge_width)
+    form_bridge(bridge_object, bridge_width)
+
+    #leave a little bit gap to lessen the artifacts when merging
+    #gap is 4% of the length of the bridge
+    gap = 0.04 * bridge_object.dimensions[0]
+    align(left_lens_object, right_lens_object, bridge_object, gap)
+
+    partial_frame = combine_left_lens_area_and_bridge(left_lens_object, bridge_object)
+    complete_frame = combine_right_lens_area_for_full_frame(right_lens_object, partial_frame)
+
+    return complete_frame
 
 
 def select_object(object):
@@ -474,6 +484,10 @@ def form_left_lens_area(left_lens_object, bridge_width, bend_degree):
 def form_right_lens_area(right_lens_object, bridge_width, bend_degree):
     separate_right_lens_area(right_lens_object, bridge_width)
     bend_lens_area(right_lens_object, bend_degree)
+
+
+def form_bridge(bridge_object, bridge_width):
+    cut_bridge(bridge_object, bridge_width)
 
 
 def bend_lens_area(lens_object, bend_degree):
@@ -528,10 +542,155 @@ def cut_bridge(bridge_object, bridge_width):
     bisect(right_bridge_boundary_from_bridge, clear_outer=True, z_tilt=-0.3)
 
 
+def align_left_lens_area_and_bridge(left_lens_area_object, bridge_object, gap):
+    select_object(bridge_object)
+    select_second_object(left_lens_area_object)
+    bpy.ops.object.align(bb_quality=True, align_mode='OPT_3', relative_to='OPT_1', align_axis={'Y'})
+
+    select_object(bridge_object)
+    bpy.ops.transform.translate(value=(gap, 0, 0), constraint_axis=(True, False, False))
+
+
+def select_second_object(object):
+    object.select = True
+
+
+def merge_objects(object_a, object_b):
+    select_object(object_b)
+    select_second_object(object_a)
+    bpy.ops.object.join()
+    combined_bridge_object = object_b
+    return combined_bridge_object
+
+
+def combine_left_lens_area_and_bridge(left_lens_area_object, bridge_object):
+    merged_frame = merge_objects(left_lens_area_object, bridge_object)
+    select_object(merged_frame)
+    bridge_left_gap(merged_frame)
+
+    return merged_frame
+
+
+def bridge_left_gap(merged_frame):
+    select_non_manifold_vertices()
+    deselect_non_manifold_vertices_on_the_right_side(merged_frame)
+    bridge_gap()
+
+
+def select_non_manifold_vertices():
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action='DESELECT')
+    bpy.ops.mesh.select_non_manifold()
+
+
+def deselect_non_manifold_vertices_on_the_right_side(merged_frame):
+
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    mesh = bmesh.from_edit_mesh(merged_frame.data)
+
+    for edge in mesh.edges:
+        start_vertex, end_vertex = edge.verts
+
+        if on_right_side(start_vertex) or on_right_side(end_vertex):
+            deselect_edge_and_associated_vertices(edge, start_vertex, end_vertex)
+
+        else:
+            pass
+
+    for vertex in mesh.verts:
+        x_coord = vertex.co[0]
+        if x_coord >= 0:
+            vertex.select = False
+
+
+def deselect_edge_and_associated_vertices(edge, start_vertex, end_vertex):
+    start_vertex.select = False
+    end_vertex.select = False
+    edge.select = False
+
+
+def get_start_and_end_vertices_from_edge(edge, mesh_object):
+    start_vertex_index, end_vertex_index = edge.vertices
+
+    start_vertex = mesh_object.data.vertices[start_vertex_index]
+    end_vertex = mesh_object.data.vertices[end_vertex_index]
+
+    return start_vertex, end_vertex
+
+
+def on_right_side(vertex):
+    x_coord = vertex.co[0]
+    if x_coord >= 0:
+        return True
+    return False
+
+
+def bridge_gap():
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.bridge_edge_loops(use_merge=True, number_cuts=3, smoothness=3)
+
+
+def combine_right_lens_area_for_full_frame(right_lens_object, partial_frame):
+    frame_object = merge_objects(right_lens_object, partial_frame)
+    select_object(frame_object)
+    bridge_right_gap(frame_object)
+
+    return frame_object
+
+
+def bridge_right_gap(frame_object):
+    select_non_manifold_vertices()
+    deselect_non_manifold_vertices_on_the_left_side(frame_object)
+    bridge_gap()
+
+
+def deselect_non_manifold_vertices_on_the_left_side(frame_object):
+    bpy.ops.object.mode_set(mode='EDIT')
+
+    mesh = bmesh.from_edit_mesh(frame_object.data)
+
+    for edge in mesh.edges:
+        start_vertex, end_vertex = edge.verts
+
+        if on_left_side(start_vertex) or on_left_side(end_vertex):
+            deselect_edge_and_associated_vertices(edge, start_vertex, end_vertex)
+
+        else:
+            pass
+
+    for vertex in mesh.verts:
+        if on_left_side(vertex):
+            vertex.select = False
+
+
+def on_left_side(vertex):
+    x_coord = vertex.co[0]
+    if x_coord <= 0:
+        return True
+    return False
+
+
+def align_right_lens_area_and_bridge(right_lens_object, bridge_object, gap):
+    select_object(bridge_object)
+    select_second_object(right_lens_object)
+    bpy.ops.object.align(bb_quality=True, align_mode='OPT_3', relative_to='OPT_1', align_axis={'Y'})
+
+    select_object(right_lens_object)
+    bpy.ops.transform.translate(value=(gap*2, 0, 0), constraint_axis=(True, False, False))
+
+
+def align(left_lens_object, right_lens_object, bridge_object, gap):
+    align_left_lens_area_and_bridge(left_lens_object, bridge_object, gap)
+    align_right_lens_area_and_bridge(right_lens_object, bridge_object, gap)
+
+
 def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5, bridge_width=10, bend_degree=0.2618):
     """
     Scale is in mm
-    :param desired_width: is the width prior to curving the lens area
+    :param desired_width: the width of the frame prior to curving the lens area
+    :param desired_thickness: thickness of the frame
+    :param bridge_width: width of the bridge
     :param bend_degree: the degree of the bend in radians
     """
 
