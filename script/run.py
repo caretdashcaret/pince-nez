@@ -186,6 +186,9 @@ def form_lens_and_bridge(bridge_width, bend_degree):
     partial_frame = combine_for_frame(left_lens_object, bridge_object, right_two_pieces=False)
     complete_frame = combine_for_frame(right_lens_object, partial_frame, right_two_pieces=True)
 
+    select_object(complete_frame)
+    move_object_origin_to_center_of_mass()
+
     return complete_frame
 
 
@@ -235,6 +238,8 @@ def form_right_lens_area(right_lens_object, bridge_width, bend_degree):
 
 def form_bridge(bridge_object, bridge_width):
     cut_bridge(bridge_object, bridge_width)
+    #bisect origin to reduce artifacts
+    bisect(0.0)
 
 
 def bend_lens_area(lens_object, bend_degree):
