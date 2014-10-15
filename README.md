@@ -7,8 +7,6 @@ A [Blender](http://www.blender.org/) script to to create 3D printable frames fro
 (http://i1115.photobucket.com/albums/k552/caretdashcaret/2014-07/Screenshot2014-07-13at75545PM_zpsda5ec6a8.png)]
 (https://github.com/caretdashcaret/pince-nez/blob/master/script/run.py)
 
-It expects a symmetrical design, and makes a best guess to place nosepads and to protrude the bridge, but does not create temples.
-
 To Run
 -------------
 
@@ -16,14 +14,15 @@ In [Blender](http://www.blender.org/), import and select the eyeglasses SVG, and
 
 Try it with an [example SVG](http://sethtaylor.com/b2/2013/09/02/free-vector-glasses-icon/)!
 
-Note: I haven't tested Spectacle Creator against a lot of frames, so the parameters might be off for some designs.
-Try toggling `bevel` and `make_thin` in the `run` parameters, as well as adjust any of the internal values.
-In general, thinner frame designs like the example work better than super thick ones, due to nosepad scaling issues.
-Sometimes there are minor issues like a few inverted orientations, so it's always a good idea to [mesh repair](
-https://github.com/caretdashcaret/MeshRepairFor3DPrinting) before printing.
-Also, exporting to an STL generally produces better results than to an OBJ.
+The script accepts a variety of parameters, such as a the `desired_width` of the frame,
+the `desired_thickness` of the frame, the `bend_degree` for the bend of the lens area.
+The script also accepts a `bridge_width` to better gauge how to bend the lens areas.
 
-The lens area may need to be manually altered to fit lenses, depending on the lens.
+This version of `pince-nez` is based on actual frame specs
+and the resulting design is much closer to real frames than the previous version.
+The automatic generation of a protruded bridge and nose pads have been temporarily removed.
+
+Beveled grooves need to be manually added to insert lenses.
 
 License
 -------------
