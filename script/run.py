@@ -171,11 +171,11 @@ def reorient_for_easier_manipulation(selected_object):
     move_to_origin(selected_object)
 
 
-def form_lens_and_bridge(bridge_width, bend_degree):
+def form_lens_and_bridge(bridge_width, lens_bend, frame_bend):
 
     bridge_object, left_lens_object, right_lens_object = duplicate_object(2)
-    form_left_lens_area(left_lens_object, bridge_width, bend_degree)
-    form_right_lens_area(right_lens_object, bridge_width, bend_degree)
+    form_left_lens_area(left_lens_object, bridge_width, lens_bend)
+    form_right_lens_area(right_lens_object, bridge_width, lens_bend)
     form_bridge(bridge_object, bridge_width)
 
     #leave a little bit gap to lessen the artifacts when merging
@@ -183,13 +183,23 @@ def form_lens_and_bridge(bridge_width, bend_degree):
     gap = 0.04 * bridge_object.dimensions[0]
     align(left_lens_object, right_lens_object, bridge_object, gap)
 
-    partial_frame = combine_for_frame(left_lens_object, bridge_object, right_two_pieces=False)
+    partial_frame = combine_left_lens_object_and_bridge(left_lens_object, bridge_object)
     complete_frame = combine_for_frame(right_lens_object, partial_frame, right_two_pieces=True)
 
     select_object(complete_frame)
     move_object_origin_to_center_of_mass()
 
+    bend_object(complete_frame, frame_bend)
+
     return complete_frame
+
+
+def combine_left_lens_object_and_bridge(left_lens_object, bridge_object):
+    return combine_for_frame(left_lens_object, bridge_object, right_two_pieces=False)
+
+
+def combine_right_lens_object_and_partial_frame(right_lens_object, partial_frame):
+    return combine_for_frame(right_lens_object, partial_frame, right_two_pieces=True)
 
 
 def select_object(object):
@@ -409,13 +419,18 @@ def align(left_lens_object, right_lens_object, bridge_object, gap):
     align_right_lens_area_and_bridge(right_lens_object, bridge_object, gap)
 
 
-def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5, bridge_width=10, bend_degree=0.2618):
+def create_eyeglasses_from_svg(desired_width=135,
+                               desired_thickness=4.5,
+                               bridge_width=10,
+                               lens_bend=0.2618,
+                               frame_bend=0.2618):
     """
     Scale is in mm
     :param desired_width: the width of the frame prior to curving the lens area
     :param desired_thickness: thickness of the frame
     :param bridge_width: width of the bridge
-    :param bend_degree: the degree of the bend in radians
+    :param bend_degree: the bend of lens areas in radians
+    :param frame_bend: the bend of the entire frame in radians
     """
 
     setup_environment()
@@ -426,9 +441,9 @@ def create_eyeglasses_from_svg(desired_width=135, desired_thickness=4.5, bridge_
 
     reorient_for_easier_manipulation(selected_object)
 
-    frame_object = form_lens_and_bridge(bridge_width, bend_degree)
+    frame_object = form_lens_and_bridge(bridge_width, lens_bend, frame_bend)
 
-    #create_nosepads(frame_object)
+    create_nosepads(frame_object)
 
     #protrude_bridge(frame_object)
 
