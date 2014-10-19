@@ -1,8 +1,8 @@
 """
 A simple script to procedurally generate 3D printable eyeglasses frames from an SVG.
 
-The order of operations is in the run method.
-In addition to the arguments, run expects a SVG to be loaded and selected in Blender.
+The order of operations is listed in the create_eyeglasses_from_svg method.
+In addition to the arguments, the script expects a SVG to be loaded and selected in Blender.
 """
 import bpy
 import bmesh
@@ -295,7 +295,7 @@ def shrink_nosepad():
     """make the nosepad thinner than the frame"""
     bpy.ops.object.mode_set(mode="EDIT")
 
-    bpy.ops.transform.shrink_fatten(value=0.006, proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=10.0)
+    bpy.ops.transform.shrink_fatten(value=0.003, proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=10.0)
 
 
 def select_nosepad_peak_vertices(lens_object, bottom_of_bridge, max_x, min_x):
@@ -587,8 +587,6 @@ def create_eyeglasses_from_svg(desired_width=135,
     reorient_for_easier_manipulation(selected_object)
 
     frame_object = form_lens_and_bridge(bridge_width, lens_bend, frame_bend, bridge_slant)
-
-    #create_nosepads(frame_object, bridge_width)
 
     #protrude_bridge(frame_object)
 
