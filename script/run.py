@@ -349,7 +349,7 @@ def select_nosepad_peak_vertices(lens_object, bottom_of_bridge, max_x, min_x):
 def find_nosepad_peak_vertices_z_range(bottom_of_bridge, bottom_of_nosepad):
     length = bottom_of_bridge - bottom_of_nosepad
 
-    peak = bottom_of_bridge - 0.4 * length
+    peak = bottom_of_bridge
     delta = 0.05 * length
 
     return peak + delta, peak - delta
