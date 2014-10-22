@@ -21,7 +21,6 @@ The script also accepts a `bridge_width` to better gauge how to bend the lens ar
 This version of `pince-nez` is based on actual frame specs
 and the resulting design is much closer to real frames than the previous version.
 The automated nosepad creation is a best guess and can be refined.
-The automatic generation of a protruded bridge have been temporarily removed.
 
 Beveled grooves need to be manually added to insert lenses.
 
