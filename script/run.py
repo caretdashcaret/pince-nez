@@ -15,6 +15,13 @@ def deselect_all_vertices():
     bpy.ops.mesh.select_all(action="DESELECT")
 
 
+def select_all_vertices():
+    """certain operations will leave vertices selected which will interfere with subsequent operations.
+    This will try to deselect everything."""
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+
+
 def extrude_curve(selected_object, extrude_amount):
     """create the basic extrusion from curve"""
 
@@ -421,6 +428,8 @@ def form_bridge(bridge_object, bridge_width, bridge_slant, bridge_protrusion_amo
     cut_bridge(bridge_object, bridge_width, bridge_slant)
     bisect_bridge_for_resolution(bridge_width, bridge_slant)
     extrude_bridge(bridge_object, bridge_width, bridge_protrusion_amount)
+    select_object(bridge_object)
+    move_object_origin_to_center_of_mass()
 
 
 def bend_lens_area(lens_object, bend_degree):
@@ -582,7 +591,7 @@ def align_right_lens_area_and_bridge(right_lens_area_object, bridge_object, gap)
 def align_lens_area_and_bridge(lens_object, bridge_object):
     select_object(bridge_object)
     select_second_object(lens_object)
-    bpy.ops.object.align(bb_quality=True, align_mode='OPT_2', relative_to='OPT_1', align_axis={'Y'})
+    bpy.ops.object.align(bb_quality=True, align_mode='OPT_1', relative_to='OPT_1', align_axis={'Y'})
 
 
 def align(left_lens_object, right_lens_object, bridge_object, gap):
@@ -593,10 +602,10 @@ def align(left_lens_object, right_lens_object, bridge_object, gap):
 def get_spread_for_bridge(max_val, number_of_segments=20):
     half = (number_of_segments + 2) / 2
 
-    lower_range = int(-1 * half)
-    upper_range = int(half + 1)
+    lower_bound = int(-1 * half)
+    upper_bound = int(half)
 
-    spread = range(lower_range, upper_range)
+    spread = range(lower_bound, upper_bound + 1)
     spread = spread[1:-1]
 
     val_spread = [1.0 * x / half * max_val for x in spread]
@@ -640,8 +649,7 @@ def protrude_bridge(protrusion_amount):
     """translate the middle section of the bridge, with propotional selection"""
     bpy.ops.object.mode_set(mode="EDIT")
 
-    bpy.ops.transform.translate(value=(0.0, protrusion_amount, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=5.0)
-
+    bpy.ops.transform.translate(value=(0.0, protrusion_amount, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=7.0)
 
 
 def compute_convergence_point(bridge_width, max_slant):
@@ -659,7 +667,7 @@ def create_eyeglasses_from_svg(desired_width=135,
                                lens_bend=0.2618,
                                frame_bend=0.3491,
                                bridge_slant=0.3,
-                               bridge_protrusion_amount=-0.8,
+                               bridge_protrusion_amount=-1.5,
                                nosepad_shrink_amount=0.003):
     """
     Scale is in mm
