@@ -167,15 +167,31 @@ def reorient_for_easier_manipulation(selected_object):
     move_to_origin(selected_object)
 
 
-def form_lens_and_bridge(bridge_width, lens_bend, frame_bend, bridge_slant):
+def form_lens_and_bridge(bridge_width,
+                         lens_bend,
+                         frame_bend,
+                         bridge_slant,
+                         bridge_protrusion_amount,
+                         nosepad_shrink_amount):
 
     bridge_object, left_lens_object, right_lens_object = duplicate_object(2)
 
-    form_bridge(bridge_object, bridge_width, bridge_slant)
+    form_bridge(bridge_object, bridge_width, bridge_slant, bridge_protrusion_amount)
     bottom_of_bridge = find_min_z_coord_of_object(bridge_object)
 
-    form_left_lens_area(left_lens_object, bridge_width, lens_bend, bridge_slant, bottom_of_bridge)
-    form_right_lens_area(right_lens_object, bridge_width, lens_bend, bridge_slant, bottom_of_bridge)
+    form_left_lens_area(left_lens_object,
+                        bridge_width,
+                        lens_bend,
+                        bridge_slant,
+                        bottom_of_bridge,
+                        nosepad_shrink_amount)
+
+    form_right_lens_area(right_lens_object,
+                         bridge_width,
+                         lens_bend,
+                         bridge_slant,
+                         bottom_of_bridge,
+                         nosepad_shrink_amount)
 
     #leave a little bit gap to lessen the artifacts when merging
     #gap is 4% of the length of the bridge
@@ -190,7 +206,6 @@ def form_lens_and_bridge(bridge_width, lens_bend, frame_bend, bridge_slant):
 
     bend_object(complete_frame, frame_bend)
 
-    return complete_frame
 
 
 def combine_left_lens_object_and_bridge(left_lens_object, bridge_object):
@@ -218,13 +233,13 @@ def duplicate_object(number_of_duplicates):
     return bpy.context.scene.objects[0], bpy.context.scene.objects[1], bpy.context.scene.objects[2]
 
 
-def bisect(x_coord, clear_inner=False, clear_outer=False, z_tilt=0.0):
+def bisect(x_coord, clear_inner=False, clear_outer=False, z_tilt=0.0, z_translation=0.0):
     """bisect at the x coordinate"""
     deselect_all_vertices()
     bpy.ops.object.mode_set(mode="EDIT")
     bpy.ops.mesh.select_all(action="SELECT")
 
-    bpy.ops.mesh.bisect(plane_co=(x_coord, 0.0, 0.0),
+    bpy.ops.mesh.bisect(plane_co=(x_coord, 0.0, z_translation),
                         plane_no=(1.0, 0.0, z_tilt),
                         threshold=0,
                         xstart=0,
@@ -235,37 +250,47 @@ def bisect(x_coord, clear_inner=False, clear_outer=False, z_tilt=0.0):
                         clear_outer=clear_outer)
 
 
-def form_left_lens_area(left_lens_object, bridge_width, bend_degree, bridge_slant, bottom_of_bridge):
+def form_left_lens_area(left_lens_object,
+                        bridge_width,
+                        bend_degree,
+                        bridge_slant,
+                        bottom_of_bridge,
+                        nosepad_shrink_amount):
     separate_left_lens_area(left_lens_object, bridge_width, bridge_slant)
-    create_left_nosepad(left_lens_object, bottom_of_bridge)
+    create_left_nosepad(left_lens_object, bottom_of_bridge, nosepad_shrink_amount)
     bend_lens_area(left_lens_object, bend_degree)
 
 
-def form_right_lens_area(right_lens_object, bridge_width, bend_degree, bridge_slant, bottom_of_bridge):
+def form_right_lens_area(right_lens_object,
+                         bridge_width,
+                         bend_degree,
+                         bridge_slant,
+                         bottom_of_bridge,
+                         nosepad_shrink_amount):
     separate_right_lens_area(right_lens_object, bridge_width, bridge_slant)
-    create_right_nosepad(right_lens_object, bottom_of_bridge)
+    create_right_nosepad(right_lens_object, bottom_of_bridge, nosepad_shrink_amount)
     bend_lens_area(right_lens_object, bend_degree)
 
 
-def create_left_nosepad(left_lens_object, bottom_of_bridge):
+def create_left_nosepad(left_lens_object, bottom_of_bridge, nosepad_shrink_amount):
     max_x, min_x = find_left_nosepad_x_coord_range(left_lens_object)
 
     non_nosepad_vertices_map = cache_non_nosepad_vertices(left_lens_object, max_x, min_x, bottom_of_bridge)
 
     select_nosepad_peak_vertices(left_lens_object, bottom_of_bridge, max_x, min_x)
-    shrink_nosepad()
+    shrink_nosepad(nosepad_shrink_amount)
     extrude_nosepad_peak()
 
     reset_normal_vertices(left_lens_object, non_nosepad_vertices_map)
 
 
-def create_right_nosepad(right_lens_object, bottom_of_bridge):
+def create_right_nosepad(right_lens_object, bottom_of_bridge, nosepad_shrink_amount):
     max_x, min_x = find_right_nosepad_x_coord_range(right_lens_object)
 
     non_nosepad_vertices_map = cache_non_nosepad_vertices(right_lens_object, max_x, min_x, bottom_of_bridge)
 
     select_nosepad_peak_vertices(right_lens_object, bottom_of_bridge, max_x, min_x)
-    shrink_nosepad()
+    shrink_nosepad(nosepad_shrink_amount)
     extrude_nosepad_peak()
 
     reset_normal_vertices(right_lens_object, non_nosepad_vertices_map)
@@ -291,11 +316,14 @@ def extrude_nosepad_peak():
                                 proportional_size=8.0)
 
 
-def shrink_nosepad():
+def shrink_nosepad(nosepad_shrink_amount):
     """make the nosepad thinner than the frame"""
     bpy.ops.object.mode_set(mode="EDIT")
 
-    bpy.ops.transform.shrink_fatten(value=0.003, proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=10.0)
+    bpy.ops.transform.shrink_fatten(value=nosepad_shrink_amount,
+                                    proportional="ENABLED",
+                                    proportional_edit_falloff="SMOOTH",
+                                    proportional_size=10.0)
 
 
 def select_nosepad_peak_vertices(lens_object, bottom_of_bridge, max_x, min_x):
@@ -389,10 +417,10 @@ def find_min_z_coord_of_object(mesh_object):
     return min(z_coords)
 
 
-def form_bridge(bridge_object, bridge_width, bridge_slant):
+def form_bridge(bridge_object, bridge_width, bridge_slant, bridge_protrusion_amount):
     cut_bridge(bridge_object, bridge_width, bridge_slant)
-    #bisect origin to reduce artifacts
-    bisect(0.0)
+    bisect_bridge_for_resolution(bridge_width, bridge_slant)
+    extrude_bridge(bridge_object, bridge_width, bridge_protrusion_amount)
 
 
 def bend_lens_area(lens_object, bend_degree):
@@ -562,12 +590,77 @@ def align(left_lens_object, right_lens_object, bridge_object, gap):
     align_right_lens_area_and_bridge(right_lens_object, bridge_object, gap)
 
 
+def get_spread_for_bridge(max_val, number_of_segments=20):
+    half = (number_of_segments + 2) / 2
+
+    lower_range = int(-1 * half)
+    upper_range = int(half + 1)
+
+    spread = range(lower_range, upper_range)
+    spread = spread[1:-1]
+
+    val_spread = [1.0 * x / half * max_val for x in spread]
+    return val_spread
+
+
+def bisect_bridge_for_resolution(bridge_width, max_slant):
+    z_translation = compute_convergence_point(bridge_width, max_slant)
+    slant_spread = get_spread_for_bridge(max_slant)
+
+    for slant in slant_spread:
+        bisect(0.0, z_tilt=slant, z_translation=z_translation)
+
+
+def extrude_bridge(bridge_object, bridge_width, bridge_protrusion_amount):
+    select_object(bridge_object)
+
+    deselect_all_vertices()
+
+    select_mid_bridge_points(bridge_object, bridge_width)
+
+    protrude_bridge(bridge_protrusion_amount)
+
+
+def select_mid_bridge_points(bridge_object, bridge_width):
+
+    bpy.ops.object.mode_set(mode="OBJECT")
+
+    positive_bridge_region = bridge_width/2
+    scaled_positive_bridge_region = positive_bridge_region/1000
+    max_region = 0.1 * scaled_positive_bridge_region
+    min_region = -1.0 * max_region
+
+    for vertex in bridge_object.data.vertices:
+        x_coord = vertex.co[0]
+        if in_range(max_region, min_region, x_coord):
+            vertex.select = True
+
+
+def protrude_bridge(protrusion_amount):
+    """translate the middle section of the bridge, with propotional selection"""
+    bpy.ops.object.mode_set(mode="EDIT")
+
+    bpy.ops.transform.translate(value=(0.0, protrusion_amount, 0.0), proportional="ENABLED", proportional_edit_falloff="SMOOTH", proportional_size=5.0)
+
+
+
+def compute_convergence_point(bridge_width, max_slant):
+    # equation of plane given
+    # the normal is (1, 0, max_slant) and
+    # a point on the plane is (-1.0 * bridge_width/2, 0, 0)
+    #find z when x is 0
+
+    return (bridge_width / 2.0) / (-1.0 * max_slant)
+
+
 def create_eyeglasses_from_svg(desired_width=135,
                                desired_thickness=4.5,
                                bridge_width=10,
                                lens_bend=0.2618,
-                               frame_bend=0.2618,
-                               bridge_slant=0.3):
+                               frame_bend=0.3491,
+                               bridge_slant=0.3,
+                               bridge_protrusion_amount=-0.8,
+                               nosepad_shrink_amount=0.003):
     """
     Scale is in mm
     :param desired_width: the width of the frame prior to curving the lens area
@@ -575,7 +668,9 @@ def create_eyeglasses_from_svg(desired_width=135,
     :param bridge_width: width of the bridge
     :param bend_degree: the bend of lens areas in radians
     :param frame_bend: the bend of the entire frame in radians
-    :param bridge_slant: the z tilt of how the bridge is slanted between the bridge and the lens area
+    :param bridge_slant: the z tilt of how the bridge is slanted between the bridge and the lens area (must be >0)
+    :param bridge_protrusion_amount: amount to protrude the bridge
+    :param nosepad_shrink_amount: amount to shrink the nosepads so that they're thin pieces
     """
 
     setup_environment()
@@ -586,9 +681,12 @@ def create_eyeglasses_from_svg(desired_width=135,
 
     reorient_for_easier_manipulation(selected_object)
 
-    frame_object = form_lens_and_bridge(bridge_width, lens_bend, frame_bend, bridge_slant)
-
-    #protrude_bridge(frame_object)
+    form_lens_and_bridge(bridge_width,
+                         lens_bend,
+                         frame_bend,
+                         bridge_slant,
+                         bridge_protrusion_amount,
+                         nosepad_shrink_amount)
 
 
 create_eyeglasses_from_svg()
