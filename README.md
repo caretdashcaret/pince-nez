@@ -4,7 +4,7 @@ pince-nez
 A [Blender](http://www.blender.org/) script to to create 3D printable frames from eyeglasses SVGs.
 
 [![Glasses Generator]
-(http://i1115.photobucket.com/albums/k552/caretdashcaret/2014-07/Screenshot2014-07-13at75545PM_zpsda5ec6a8.png)]
+(http://i1115.photobucket.com/albums/k552/caretdashcaret/2015-02/generated_glasses_zpsgkkex7p0.png)]
 (https://github.com/caretdashcaret/pince-nez/blob/master/script/run.py)
 
 To Run
