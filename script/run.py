@@ -597,6 +597,10 @@ def align_lens_area_and_bridge(lens_object, bridge_object):
 def align(left_lens_object, right_lens_object, bridge_object, gap):
     align_left_lens_area_and_bridge(left_lens_object, bridge_object, gap)
     align_right_lens_area_and_bridge(right_lens_object, bridge_object, gap)
+    
+    #experimental additional translation    
+    select_object(bridge_object)
+    bpy.ops.transform.translate(value=(0,1,0))
 
 
 def get_spread_for_bridge(max_val, number_of_segments=20):
