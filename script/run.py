@@ -205,6 +205,9 @@ def form_lens_and_bridge(bridge_width,
     gap = 0.04 * bridge_object.dimensions[0]
     align(left_lens_object, right_lens_object, bridge_object, gap)
 
+    select_object(bridge_object)
+    bpy.ops.transform.translate(value=(0,1,0))
+
     partial_frame = combine_left_lens_object_and_bridge(left_lens_object, bridge_object)
     complete_frame = combine_right_lens_object_and_partial_frame(right_lens_object, partial_frame)
 
@@ -317,10 +320,10 @@ def extrude_nosepad_peak():
     """translate the nosepad along the y-axis"""
     bpy.ops.object.mode_set(mode="EDIT")
 
-    bpy.ops.transform.translate(value=(0.0, 4.0, 2.0),
+    bpy.ops.transform.translate(value=(0.0, 6.0, 0),
                                 proportional="ENABLED",
                                 proportional_edit_falloff="SMOOTH",
-                                proportional_size=8.0)
+                                proportional_size=15.0)
 
 
 def shrink_nosepad(nosepad_shrink_amount):
@@ -330,7 +333,7 @@ def shrink_nosepad(nosepad_shrink_amount):
     bpy.ops.transform.shrink_fatten(value=nosepad_shrink_amount,
                                     proportional="ENABLED",
                                     proportional_edit_falloff="SMOOTH",
-                                    proportional_size=10.0)
+                                    proportional_size=15.0)
 
 
 def select_nosepad_peak_vertices(lens_object, bottom_of_bridge, max_x, min_x):
@@ -350,9 +353,9 @@ def find_nosepad_peak_vertices_z_range(bottom_of_bridge, bottom_of_nosepad):
     length = bottom_of_bridge - bottom_of_nosepad
 
     peak = bottom_of_bridge
-    delta = 0.05 * length
+    delta = 0.1 * length
 
-    return peak + delta, peak - delta
+    return peak - 2* delta, peak - 3 *delta
 
 
 def find_bottom_of_nosepad_region(lens_object, max_x, min_x):
@@ -397,8 +400,8 @@ def find_nosepad_x_coord_range(lens_object, left_nosepad=True):
     max_x, min_x = find_max_and_min_x_coord_of_object(lens_object)
 
     width = max_x - min_x
-    #nosepad within ~18% of the entire frame
-    nosepad_range_width = 0.18 * width
+    #nosepad within ~25% of the lens
+    nosepad_range_width = 0.25 * width
 
     if left_nosepad:
         min_x = max_x - nosepad_range_width
@@ -597,10 +600,6 @@ def align_lens_area_and_bridge(lens_object, bridge_object):
 def align(left_lens_object, right_lens_object, bridge_object, gap):
     align_left_lens_area_and_bridge(left_lens_object, bridge_object, gap)
     align_right_lens_area_and_bridge(right_lens_object, bridge_object, gap)
-    
-    #experimental additional translation    
-    select_object(bridge_object)
-    bpy.ops.transform.translate(value=(0,1,0))
 
 
 def get_spread_for_bridge(max_val, number_of_segments=20):
@@ -671,7 +670,7 @@ def create_eyeglasses_from_svg(desired_width=135,
                                lens_bend=0.2618,
                                frame_bend=0.3491,
                                bridge_slant=0.3,
-                               bridge_protrusion_amount=-1.5,
+                               bridge_protrusion_amount=-1.0,
                                nosepad_shrink_amount=0.003):
     """
     Scale is in mm
