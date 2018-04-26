@@ -35,5 +35,3 @@ Credits
 -------------
 
 Created by Jenny - [CaretDashCaret](http://caretdashcaret.wordpress.com/)
-
-[![Jenny](http://i1115.photobucket.com/albums/k552/caretdashcaret/2014-03/About5_zps7f79c497.jpg)](http://caretdashcaret.wordpress.com/)
